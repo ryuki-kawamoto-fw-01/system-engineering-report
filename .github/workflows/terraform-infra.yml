@@ -1,6 +1,6 @@
 # Phase 0: OIDCログインだけ確認
 
-name: Test Azure OIDC Login
+name: CICD
 
 on:
   workflow_dispatch:
