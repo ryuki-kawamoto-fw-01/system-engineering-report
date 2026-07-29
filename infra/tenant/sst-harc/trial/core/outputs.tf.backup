@@ -1,0 +1,915 @@
+# =============================================================================
+# Outputs - sst-harc/test/core
+# =============================================================================
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Resource Group
+# -----------------------------------------------------------------------------
+
+output "resource_group_name" {
+  description = "リソースグループ名"
+  value       = module.common.resource_group_name
+}
+
+output "resource_group_id" {
+  description = "リソースグループID"
+  value       = module.common.resource_group_id
+}
+
+output "location" {
+  description = "チE�Eロイ先リージョン"
+  value       = module.common.location
+}
+
+# -----------------------------------------------------------------------------
+# Log Analytics
+# -----------------------------------------------------------------------------
+
+output "log_analytics_workspace_id" {
+  description = "Log Analytics Workspace ID"
+  value       = module.log_analytics.log_analytics_workspace_id
+}
+
+output "log_analytics_workspace_name" {
+  description = "Log Analytics Workspace名"
+  value       = local.log_name
+}
+
+# -----------------------------------------------------------------------------
+# Virtual Network
+# -----------------------------------------------------------------------------
+
+output "vnet_id" {
+  description = "Virtual Network ID"
+  value       = module.vnet.vnet_id
+}
+
+output "vnet_name" {
+  description = "Virtual Network名"
+  value       = module.vnet.vnet_name
+}
+
+output "subnet_ids" {
+  description = "サブネットIDのマップ"
+  value       = module.vnet.subnet_ids
+}
+
+output "subnet_p5190_spoke_privatesubnet001_id" {
+  description = "P5190-Spoke-PrivateSubnet001のサブネチE��ID"
+  value       = module.vnet.subnet_ids["P5190-Spoke-PrivateSubnet001"]
+}
+
+output "subnet_p5190_spoke_privatesubnet002_id" {
+  description = "P5190-Spoke-PrivateSubnet002のサブネチE��ID"
+  value       = module.vnet.subnet_ids["P5190-Spoke-PrivateSubnet002"]
+}
+
+output "subnet_p5190_spoke_privatesubnet004_id" {
+  description = "P5190-Spoke-PrivateSubnet004のサブネチE��ID"
+  value       = module.vnet.subnet_ids["P5190-Spoke-PrivateSubnet004"]
+}
+
+output "subnet_app_id" {
+  description = "App用サブネチE��ID"
+  value       = module.vnet.subnet_ids["subnet-app"]
+}
+
+output "subnet_func_id" {
+  description = "Function用サブネチE��ID"
+  value       = module.vnet.subnet_ids["subnet-func"]
+}
+
+output "subnet_private_endpoint_id" {
+  description = "Private Endpoint用サブネチE��ID"
+  value       = module.vnet.subnet_ids["subnet-private-endpoint"]
+}
+
+# -----------------------------------------------------------------------------
+# Storage Accounts
+# -----------------------------------------------------------------------------
+
+output "storage_account_main_id" {
+  description = "メインStorage Account ID"
+  value       = module.storage_account_main.storage_account_id
+}
+
+output "storage_account_main_name" {
+  description = "メインStorage Account名"
+  value       = module.storage_account_main.storage_account_name
+}
+
+output "storage_account_main_primary_blob_endpoint" {
+  description = "メインStorage AccountのBlobエンドポイント"
+  value       = module.storage_account_main.primary_blob_endpoint
+}
+
+output "storage_account_function_id" {
+  description = "Function用Storage Account ID"
+  value       = module.storage_account_function.storage_account_id
+}
+
+output "storage_account_function_name" {
+  description = "Function用Storage Account名"
+  value       = module.storage_account_function.storage_account_name
+}
+
+output "storage_account_frontend_id" {
+  description = "Frontend用Storage Account ID"
+  value       = module.storage_account_frontend.storage_account_id
+}
+
+output "storage_account_frontend_name" {
+  description = "Frontend用Storage Account名"
+  value       = module.storage_account_frontend.storage_account_name
+}
+
+# -----------------------------------------------------------------------------
+# Container Registry
+# -----------------------------------------------------------------------------
+
+output "container_registry_id" {
+  description = "Container Registry ID"
+  value       = module.container_registry.registry_id
+}
+
+output "container_registry_name" {
+  description = "Container Registry名"
+  value       = module.container_registry.registry_name
+}
+
+output "container_registry_login_server" {
+  description = "Container Registryログインサーバ�E"
+  value       = module.container_registry.login_server
+}
+
+# -----------------------------------------------------------------------------
+# Cosmos DB
+# -----------------------------------------------------------------------------
+
+output "cosmosdb_account_id" {
+  description = "Cosmos DB Account ID"
+  value       = module.cosmos_db.account_id
+}
+
+output "cosmosdb_account_name" {
+  description = "Cosmos DB Account名"
+  value       = module.cosmos_db.account_name
+}
+
+output "cosmosdb_endpoint" {
+  description = "Cosmos DBエンドポイント"
+  value       = module.cosmos_db.endpoint
+}
+
+output "cosmosdb_database_names" {
+  description = "Cosmos DBデータベース名のリスト"
+  value       = keys(local.cosmosdb_databases)
+}
+
+output "cosmosdb_primary_key" {
+  description = "Cosmos DBプライマリキー(機密情報)"
+  value       = module.cosmos_db.primary_key
+  sensitive   = true
+}
+
+# -----------------------------------------------------------------------------
+# Key Vault
+# -----------------------------------------------------------------------------
+
+output "key_vault_id" {
+  description = "Key Vault ID"
+  value       = module.key_vault.id
+}
+
+output "key_vault_name" {
+  description = "Key Vault名"
+  value       = module.key_vault.name
+}
+
+output "key_vault_uri" {
+  description = "Key Vault URI"
+  value       = module.key_vault.vault_uri
+}
+
+# -----------------------------------------------------------------------------
+# Private DNS Zones
+# -----------------------------------------------------------------------------
+
+output "private_dns_zone_ids" {
+  description = "Private DNS Zone IDのマップ"
+  value = {
+    for zone_name, zone_module in module.private_dns_zone : zone_name => zone_module.dns_zone_id
+  }
+}
+
+# -----------------------------------------------------------------------------
+# App Services
+# -----------------------------------------------------------------------------
+
+output "app_service_frontend_id" {
+  description = "Frontend App Service ID"
+  value       = module.app_service_frontend.app_service_id
+}
+
+output "app_service_frontend_name" {
+  description = "Frontend App Service名"
+  value       = module.app_service_frontend.app_service_name
+}
+
+output "app_service_frontend_default_hostname" {
+  description = "Frontend App ServiceチE��ォルト�Eスト名"
+  value       = module.app_service_frontend.default_hostname
+}
+
+output "app_service_loadbalancer_id" {
+  description = "Load Balancer App Service ID"
+  value       = module.app_service_loadbalancer.app_service_id
+}
+
+output "app_service_loadbalancer_name" {
+  description = "Load Balancer App Service名"
+  value       = module.app_service_loadbalancer.app_service_name
+}
+
+output "app_service_loadbalancer_default_hostname" {
+  description = "Load Balancer App ServiceチE��ォルト�Eスト名"
+  value       = module.app_service_loadbalancer.app_service_default_hostname
+}
+
+output "loadbalancer_app_insights_id" {
+  description = "Load Balancer Application Insights ID"
+  value       = azurerm_application_insights.loadbalancer.id
+}
+
+output "loadbalancer_app_insights_connection_string" {
+  description = "Load Balancer Application Insights接続文字�E"
+  value       = azurerm_application_insights.loadbalancer.connection_string
+  sensitive   = true
+}
+
+output "loadbalancer_app_insights_instrumentation_key" {
+  description = "Load Balancer Application InsightsインストルメンチE�Eションキー"
+  value       = azurerm_application_insights.loadbalancer.instrumentation_key
+  sensitive   = true
+}
+
+# -----------------------------------------------------------------------------
+# Function Apps
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Function Apps - Standard Plan
+# -----------------------------------------------------------------------------
+
+output "function_app_plan_standard_id" {
+  description = "Function App Plan�E�通常プラン�E�ID"
+  value       = azurerm_service_plan.function_plan_standard.id
+}
+
+output "function_app_plan_standard_name" {
+  description = "Function App Plan�E�通常プラン�E�名"
+  value       = azurerm_service_plan.function_plan_standard.name
+}
+
+output "function_app_plan_premium_id" {
+  description = "Function App Plan�E�Eremiumプラン�E�ID"
+  value       = azurerm_service_plan.function_plan_premium.id
+}
+
+output "function_app_plan_premium_name" {
+  description = "Function App Plan�E�Eremiumプラン�E�名"
+  value       = azurerm_service_plan.function_plan_premium.name
+}
+
+# Function App 01: Chat
+output "function_app_01_chat_id" {
+  description = "Function App 01 Chat ID"
+  value       = module.function_app_01_chat.function_app_id
+}
+
+output "function_app_01_chat_principal_id" {
+  description = "Function App 01 Chat Principal ID"
+  value       = module.function_app_01_chat.function_app_identity_principal_id
+}
+
+# Function App 02: RAG
+output "function_app_02_rag_id" {
+  description = "Function App 02 RAG ID"
+  value       = module.function_app_02_rag.function_app_id
+}
+
+output "function_app_02_rag_principal_id" {
+  description = "Function App 02 RAG Principal ID"
+  value       = module.function_app_02_rag.function_app_identity_principal_id
+}
+
+# Function App 03: Text Register
+output "function_app_03_text_register_id" {
+  description = "Function App 03 Text Register ID"
+  value       = module.function_app_03_text_register.function_app_id
+}
+
+output "function_app_03_text_register_principal_id" {
+  description = "Function App 03 Text Register Principal ID"
+  value       = module.function_app_03_text_register.function_app_identity_principal_id
+}
+
+# Function App 04: PII
+output "function_app_04_pii_id" {
+  description = "Function App 04 PII ID"
+  value       = module.function_app_04_pii.function_app_id
+}
+
+output "function_app_04_pii_principal_id" {
+  description = "Function App 04 PII Principal ID"
+  value       = module.function_app_04_pii.function_app_identity_principal_id
+}
+
+# Function App 05: Prompt
+output "function_app_05_prompt_id" {
+  description = "Function App 05 Prompt ID"
+  value       = module.function_app_05_prompt.function_app_id
+}
+
+output "function_app_05_prompt_principal_id" {
+  description = "Function App 05 Prompt Principal ID"
+  value       = module.function_app_05_prompt.function_app_identity_principal_id
+}
+
+# Function App 06: Pagesplitter (Premium)
+output "function_app_06_pagesplitter_id" {
+  description = "Function App 06 Pagesplitter ID"
+  value       = module.function_app_06_pagesplitter.function_app_id
+}
+
+output "function_app_06_pagesplitter_principal_id" {
+  description = "Function App 06 Pagesplitter Principal ID"
+  value       = module.function_app_06_pagesplitter.function_app_identity_principal_id
+}
+
+# Function App 07: Markdown (Premium)
+output "function_app_07_markdown_id" {
+  description = "Function App 07 Markdown ID"
+  value       = module.function_app_07_markdown.function_app_id
+}
+
+output "function_app_07_markdown_principal_id" {
+  description = "Function App 07 Markdown Principal ID"
+  value       = module.function_app_07_markdown.function_app_identity_principal_id
+}
+
+# Function App 08: PDF
+output "function_app_08_pdf_id" {
+  description = "Function App 08 PDF ID"
+  value       = module.function_app_08_pdf.function_app_id
+}
+
+output "function_app_08_pdf_principal_id" {
+  description = "Function App 08 PDF Principal ID"
+  value       = module.function_app_08_pdf.function_app_identity_principal_id
+}
+
+# Function App 09: MFG
+output "function_app_09_mfg_id" {
+  description = "Function App 09 MFG ID"
+  value       = module.function_app_09_mfg.function_app_id
+}
+
+output "function_app_09_mfg_principal_id" {
+  description = "Function App 09 MFG Principal ID"
+  value       = module.function_app_09_mfg.function_app_identity_principal_id
+}
+
+# Function App 10: Agent RAG
+output "function_app_10_agent_rag_id" {
+  description = "Function App 10 Agent RAG ID"
+  value       = module.function_app_10_agent_rag.function_app_id
+}
+
+output "function_app_10_agent_rag_principal_id" {
+  description = "Function App 10 Agent RAG Principal ID"
+  value       = module.function_app_10_agent_rag.function_app_identity_principal_id
+}
+
+# Function App 11: Agent Document
+output "function_app_11_agent_document_id" {
+  description = "Function App 11 Agent Document ID"
+  value       = module.function_app_11_agent_document.function_app_id
+}
+
+output "function_app_11_agent_document_principal_id" {
+  description = "Function App 11 Agent Document Principal ID"
+  value       = module.function_app_11_agent_document.function_app_identity_principal_id
+}
+
+# Function App 12: Page2 (Premium)
+output "function_app_12_page2_id" {
+  description = "Function App 12 Page2 ID"
+  value       = module.function_app_12_page2.function_app_id
+}
+
+output "function_app_12_page2_principal_id" {
+  description = "Function App 12 Page2 Principal ID"
+  value       = module.function_app_12_page2.function_app_identity_principal_id
+}
+
+# Function App 13: Mark2 (Premium)
+output "function_app_13_mark2_id" {
+  description = "Function App 13 Mark2 ID"
+  value       = module.function_app_13_mark2.function_app_id
+}
+
+output "function_app_13_mark2_principal_id" {
+  description = "Function App 13 Mark2 Principal ID"
+  value       = module.function_app_13_mark2.function_app_identity_principal_id
+}
+
+# Function App 14: Indexer
+output "function_app_14_indexer_id" {
+  description = "Function App 14 Indexer ID"
+  value       = module.function_app_14_indexer.function_app_id
+}
+
+output "function_app_14_indexer_principal_id" {
+  description = "Function App 14 Indexer Principal ID"
+  value       = module.function_app_14_indexer.function_app_identity_principal_id
+}
+
+# Function App Markdown-002
+output "function_app_markdown_002_id" {
+  description = "Function App Markdown-002 ID"
+  value       = module.function_app_markdown_002.function_app_id
+}
+
+output "function_app_markdown_002_principal_id" {
+  description = "Function App Markdown-002 Principal ID"
+  value       = module.function_app_markdown_002.function_app_identity_principal_id
+}
+
+output "function_app_markdown_002_name" {
+  description = "Function App Markdown-002 Name"
+  value       = module.function_app_markdown_002.function_app_name
+}
+
+# Function App Markdown-001
+output "function_app_markdown_001_id" {
+  description = "Function App Markdown-001 ID"
+  value       = module.function_app_markdown_001.function_app_id
+}
+
+output "function_app_markdown_001_principal_id" {
+  description = "Function App Markdown-001 Principal ID"
+  value       = module.function_app_markdown_001.function_app_identity_principal_id
+}
+
+output "function_app_markdown_001_name" {
+  description = "Function App Markdown-001 Name"
+  value       = module.function_app_markdown_001.function_app_name
+}
+
+# Function App Pagespliter-002
+output "function_app_pagespliter_002_id" {
+  description = "Function App Pagespliter-002 ID"
+  value       = module.function_app_pagespliter_002.function_app_id
+}
+
+output "function_app_pagespliter_002_principal_id" {
+  description = "Function App Pagespliter-002 Principal ID (Known: 2e52d7e4-6391-4b12-9cea-07c60e7269ae)"
+  value       = module.function_app_pagespliter_002.function_app_identity_principal_id
+}
+
+output "function_app_pagespliter_002_name" {
+  description = "Function App Pagespliter-002 Name"
+  value       = module.function_app_pagespliter_002.function_app_name
+}
+
+output "function_app_pagespliter_002_app_insights_name" {
+  description = "Function App Pagespliter-002 Application Insights Name"
+  value       = azurerm_application_insights.app_insights_func_pagespliter_002.name
+}
+
+output "function_app_pagespliter_002_diagnostic_setting_name" {
+  description = "Function App Pagespliter-002 Diagnostic Setting Name"
+  value       = "log-func-genashi-test-pagespliter-002"
+}
+
+# Function App Pagespliter-001
+output "function_app_pagespliter_001_id" {
+  description = "Function App Pagespliter-001 ID"
+  value       = module.function_app_pagespliter_001.function_app_id
+}
+
+output "function_app_pagespliter_001_principal_id" {
+  description = "Function App Pagespliter-001 Principal ID"
+  value       = module.function_app_pagespliter_001.function_app_identity_principal_id
+}
+
+output "function_app_pagespliter_001_name" {
+  description = "Function App Pagespliter-001 Name"
+  value       = module.function_app_pagespliter_001.function_app_name
+}
+
+output "function_app_pagespliter_001_app_insights_name" {
+  description = "Function App Pagespliter-001 Application Insights Name"
+  value       = azurerm_application_insights.app_insights_func_pagespliter_001.name
+}
+
+output "function_app_pagespliter_001_diagnostic_setting_name" {
+  description = "Function App Pagespliter-001 Diagnostic Setting Name"
+  value       = "log-func-genashi-test-pagespliter"
+}
+
+# Function App PDF-01 (Container)
+output "function_app_pdf_01_id" {
+  description = "Function App PDF-01 ID"
+  value       = azurerm_linux_function_app.func_pdf_01.id
+}
+
+output "function_app_pdf_01_principal_id" {
+  description = "Function App PDF-01 Principal ID (Known: 87194fcf-3043-45d1-a661-f9da73ff7cf5)"
+  value       = azurerm_linux_function_app.func_pdf_01.identity[0].principal_id
+}
+
+output "function_app_pdf_01_name" {
+  description = "Function App PDF-01 Name"
+  value       = azurerm_linux_function_app.func_pdf_01.name
+}
+
+output "function_app_pdf_01_app_insights_name" {
+  description = "Function App PDF-01 Application Insights Name"
+  value       = azurerm_application_insights.app_insights_func_pdf_01.name
+}
+
+output "function_app_pdf_01_default_hostname" {
+  description = "Function App PDF-01 Default Hostname"
+  value       = azurerm_linux_function_app.func_pdf_01.default_hostname
+}
+
+output "function_app_pdf_01_private_endpoint_id" {
+  description = "Function App PDF-01 Private Endpoint ID"
+  value       = module.func_pdf_01_private_endpoint.private_endpoint_id
+}
+
+output "function_app_pdf_01_container_image" {
+  description = "Function App PDF-01 Container Image (TODO: Update with actual image)"
+  value       = "acrgenashitest01.azurecr.io/pdf-converter:latest"
+}
+
+# Backend Function App PII
+output "backend_pii_function_app_id" {
+  description = "Backend PII Function App ID"
+  value       = azurerm_linux_function_app.backend_pii.id
+}
+
+output "backend_pii_function_app_name" {
+  description = "Backend PII Function App Name"
+  value       = azurerm_linux_function_app.backend_pii.name
+}
+
+output "backend_pii_principal_id" {
+  description = "Backend PII Managed Identity Principal ID"
+  value       = azurerm_linux_function_app.backend_pii.identity[0].principal_id
+}
+
+output "backend_pii_app_insights_name" {
+  description = "Backend PII Application Insights Name"
+  value       = azurerm_application_insights.app_insights_backend_pii.name
+}
+
+output "backend_pii_diagnostic_setting_name" {
+  description = "Backend PII Diagnostic Setting Name"
+  value       = azurerm_monitor_diagnostic_setting.backend_pii.name
+}
+
+output "backend_pii_private_endpoint_id" {
+  description = "Backend PII Private Endpoint ID"
+  value       = module.backend_pii_private_endpoint.private_endpoint_id
+}
+
+output "backend_pii_private_endpoint_name" {
+  description = "Backend PII Private Endpoint Name"
+  value       = local.backend_pii_private_endpoint_name
+}
+
+output "backend_pii_default_hostname" {
+  description = "Backend PII Default Hostname"
+  value       = azurerm_linux_function_app.backend_pii.default_hostname
+}
+
+# Backend Function App RAG
+output "backend_rag_function_app_id" {
+  description = "Backend RAG Function App ID"
+  value       = azurerm_linux_function_app.backend_rag.id
+}
+
+output "backend_rag_function_app_name" {
+  description = "Backend RAG Function App Name"
+  value       = azurerm_linux_function_app.backend_rag.name
+}
+
+output "backend_rag_principal_id" {
+  description = "Backend RAG Managed Identity Principal ID"
+  value       = azurerm_linux_function_app.backend_rag.identity[0].principal_id
+}
+
+output "backend_rag_app_insights_name" {
+  description = "Backend RAG Application Insights Name"
+  value       = azurerm_application_insights.app_insights_backend_rag.name
+}
+
+output "backend_rag_diagnostic_setting_name" {
+  description = "Backend RAG Diagnostic Setting Name"
+  value       = azurerm_monitor_diagnostic_setting.backend_rag.name
+}
+
+output "backend_rag_private_endpoint_id" {
+  description = "Backend RAG Private Endpoint ID"
+  value       = module.backend_rag_private_endpoint.private_endpoint_id
+}
+
+output "backend_rag_private_endpoint_name" {
+  description = "Backend RAG Private Endpoint Name"
+  value       = local.backend_rag_private_endpoint_name
+}
+
+output "backend_rag_default_hostname" {
+  description = "Backend RAG Default Hostname"
+  value       = azurerm_linux_function_app.backend_rag.default_hostname
+}
+
+# Backend Function App Register
+output "backend_register_function_app_id" {
+  description = "Backend Register Function App ID"
+  value       = azurerm_linux_function_app.backend_register.id
+}
+
+output "backend_register_function_app_name" {
+  description = "Backend Register Function App Name"
+  value       = azurerm_linux_function_app.backend_register.name
+}
+
+output "backend_register_principal_id" {
+  description = "Backend Register Managed Identity Principal ID"
+  value       = azurerm_linux_function_app.backend_register.identity[0].principal_id
+}
+
+output "backend_register_app_insights_name" {
+  description = "Backend Register Application Insights Name"
+  value       = azurerm_application_insights.app_insights_backend_register.name
+}
+
+output "backend_register_diagnostic_setting_name" {
+  description = "Backend Register Diagnostic Setting Name"
+  value       = azurerm_monitor_diagnostic_setting.backend_register.name
+}
+
+output "backend_register_private_endpoint_id" {
+  description = "Backend Register Private Endpoint ID"
+  value       = module.backend_register_private_endpoint.private_endpoint_id
+}
+
+output "backend_register_private_endpoint_name" {
+  description = "Backend Register Private Endpoint Name"
+  value       = local.backend_register_private_endpoint_name
+}
+
+output "backend_register_default_hostname" {
+  description = "Backend Register Default Hostname"
+  value       = azurerm_linux_function_app.backend_register.default_hostname
+}
+
+# Backend Function App Prompt
+output "backend_prompt_function_app_id" {
+  description = "Backend Prompt Function App ID"
+  value       = azurerm_linux_function_app.backend_prompt.id
+}
+
+output "backend_prompt_function_app_name" {
+  description = "Backend Prompt Function App Name"
+  value       = azurerm_linux_function_app.backend_prompt.name
+}
+
+output "backend_prompt_principal_id" {
+  description = "Backend Prompt Managed Identity Principal ID"
+  value       = azurerm_linux_function_app.backend_prompt.identity[0].principal_id
+}
+
+output "backend_prompt_app_insights_name" {
+  description = "Backend Prompt Application Insights Name"
+  value       = azurerm_application_insights.app_insights_backend_prompt.name
+}
+
+output "backend_prompt_diagnostic_setting_name" {
+  description = "Backend Prompt Diagnostic Setting Name"
+  value       = azurerm_monitor_diagnostic_setting.backend_prompt.name
+}
+
+output "backend_prompt_private_endpoint_id" {
+  description = "Backend Prompt Private Endpoint ID"
+  value       = module.backend_prompt_private_endpoint.private_endpoint_id
+}
+
+output "backend_prompt_private_endpoint_name" {
+  description = "Backend Prompt Private Endpoint Name"
+  value       = local.backend_prompt_private_endpoint_name
+}
+
+output "backend_prompt_default_hostname" {
+  description = "Backend Prompt Default Hostname"
+  value       = azurerm_linux_function_app.backend_prompt.default_hostname
+}
+
+# Function App Agent Document
+output "func_agent_document_function_app_id" {
+  description = "Function Agent Document Function App ID"
+  value       = azurerm_linux_function_app.func_agent_document.id
+}
+
+output "func_agent_document_function_app_name" {
+  description = "Function Agent Document Function App Name"
+  value       = azurerm_linux_function_app.func_agent_document.name
+}
+
+output "func_agent_document_principal_id" {
+  description = "Function Agent Document Managed Identity Principal ID"
+  value       = azurerm_linux_function_app.func_agent_document.identity[0].principal_id
+}
+
+output "func_agent_document_app_insights_name" {
+  description = "Function Agent Document Application Insights Name"
+  value       = azurerm_application_insights.app_insights_func_agent_document.name
+}
+
+output "func_agent_document_diagnostic_setting_name" {
+  description = "Function Agent Document Diagnostic Setting Name"
+  value       = azurerm_monitor_diagnostic_setting.func_agent_document.name
+}
+
+output "func_agent_document_private_endpoint_id" {
+  description = "Function Agent Document Private Endpoint ID"
+  value       = module.func_agent_document_private_endpoint.private_endpoint_id
+}
+
+output "func_agent_document_private_endpoint_name" {
+  description = "Function Agent Document Private Endpoint Name"
+  value       = local.func_agent_document_private_endpoint_name
+}
+
+output "func_agent_document_default_hostname" {
+  description = "Function Agent Document Default Hostname"
+  value       = azurerm_linux_function_app.func_agent_document.default_hostname
+}
+
+output "func_agent_document_log_analytics_workspace_name" {
+  description = "Function Agent Document Log Analytics Workspace Name"
+  value       = local.log_name
+}
+
+# Function App RAG
+output "func_rag_function_app_id" {
+  description = "Function RAG Function App ID"
+  value       = azurerm_linux_function_app.func_rag.id
+}
+
+output "func_rag_function_app_name" {
+  description = "Function RAG Function App Name"
+  value       = azurerm_linux_function_app.func_rag.name
+}
+
+output "func_rag_principal_id" {
+  description = "Function RAG Managed Identity Principal ID"
+  value       = azurerm_linux_function_app.func_rag.identity[0].principal_id
+}
+
+output "func_rag_app_insights_name" {
+  description = "Function RAG Application Insights Name"
+  value       = azurerm_application_insights.app_insights_func_rag.name
+}
+
+output "func_rag_diagnostic_setting_name" {
+  description = "Function RAG Diagnostic Setting Name"
+  value       = azurerm_monitor_diagnostic_setting.func_rag.name
+}
+
+output "func_rag_private_endpoint_id" {
+  description = "Function RAG Private Endpoint ID"
+  value       = module.func_rag_private_endpoint.private_endpoint_id
+}
+
+output "func_rag_private_endpoint_name" {
+  description = "Function RAG Private Endpoint Name"
+  value       = local.func_rag_private_endpoint_name
+}
+
+output "func_rag_default_hostname" {
+  description = "Function RAG Default Hostname"
+  value       = azurerm_linux_function_app.func_rag.default_hostname
+}
+
+output "func_rag_log_analytics_workspace_name" {
+  description = "Function RAG Log Analytics Workspace Name"
+  value       = local.log_name
+}
+
+# Function App Agent RAG
+output "func_agent_rag_function_app_id" {
+  description = "Function Agent RAG Function App ID"
+  value       = azurerm_linux_function_app.func_agent_rag.id
+}
+
+output "func_agent_rag_function_app_name" {
+  description = "Function Agent RAG Function App Name"
+  value       = azurerm_linux_function_app.func_agent_rag.name
+}
+
+output "func_agent_rag_principal_id" {
+  description = "Function Agent RAG Managed Identity Principal ID"
+  value       = azurerm_linux_function_app.func_agent_rag.identity[0].principal_id
+}
+
+output "func_agent_rag_app_insights_name" {
+  description = "Function Agent RAG Application Insights Name"
+  value       = azurerm_application_insights.app_insights_func_agent_rag.name
+}
+
+output "func_agent_rag_diagnostic_setting_name" {
+  description = "Function Agent RAG Diagnostic Setting Name"
+  value       = azurerm_monitor_diagnostic_setting.func_agent_rag.name
+}
+
+output "func_agent_rag_private_endpoint_id" {
+  description = "Function Agent RAG Private Endpoint ID"
+  value       = module.func_agent_rag_private_endpoint.private_endpoint_id
+}
+
+output "func_agent_rag_private_endpoint_name" {
+  description = "Function Agent RAG Private Endpoint Name"
+  value       = local.func_agent_rag_private_endpoint_name
+}
+
+output "func_agent_rag_default_hostname" {
+  description = "Function Agent RAG Default Hostname"
+  value       = azurerm_linux_function_app.func_agent_rag.default_hostname
+}
+
+output "func_agent_rag_log_analytics_workspace_name" {
+  description = "Function Agent RAG Log Analytics Workspace Name"
+  value       = local.log_name
+}
+
+# Backend Function App MFG
+output "backend_mfg_function_app_id" {
+  description = "Backend MFG Function App ID"
+  value       = azurerm_linux_function_app.backend_mfg.id
+}
+
+output "backend_mfg_function_app_name" {
+  description = "Backend MFG Function App Name"
+  value       = azurerm_linux_function_app.backend_mfg.name
+}
+
+output "backend_mfg_principal_id" {
+  description = "Backend MFG Managed Identity Principal ID"
+  value       = azurerm_linux_function_app.backend_mfg.identity[0].principal_id
+}
+
+output "backend_mfg_app_insights_name" {
+  description = "Backend MFG Application Insights Name"
+  value       = azurerm_application_insights.app_insights_backend_mfg.name
+}
+
+output "backend_mfg_diagnostic_setting_name" {
+  description = "Backend MFG Diagnostic Setting Name"
+  value       = azurerm_monitor_diagnostic_setting.backend_mfg.name
+}
+
+output "backend_mfg_private_endpoint_id" {
+  description = "Backend MFG Private Endpoint ID"
+  value       = module.backend_mfg_private_endpoint.private_endpoint_id
+}
+
+output "backend_mfg_private_endpoint_name" {
+  description = "Backend MFG Private Endpoint Name"
+  value       = local.backend_mfg_private_endpoint_name
+}
+
+output "backend_mfg_default_hostname" {
+  description = "Backend MFG Default Hostname"
+  value       = azurerm_linux_function_app.backend_mfg.default_hostname
+}
+
+output "backend_mfg_log_analytics_workspace_name" {
+  description = "Backend MFG Log Analytics Workspace Name"
+  value       = local.log_name
+}
+
+# -----------------------------------------------------------------------------
+# Tags
+# -----------------------------------------------------------------------------
+
+output "common_tags" {
+  description = "全リソースに適用される�E通タグ"
+  value       = local.tags
+}
+

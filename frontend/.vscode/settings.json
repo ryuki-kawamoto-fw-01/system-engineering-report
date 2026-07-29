@@ -1,0 +1,15 @@
+{
+  "appService.zipIgnorePattern": [
+    "node_modules{,/**}",
+    ".vscode{,/**}",
+    ".next{,/**}",
+    ".env.local",
+    ".env.development",
+    ".env.sample",
+    ".gitignore",
+    "package-lock.json",
+    "README.md"
+  ],
+  "appService.defaultWebAppToDeploy": ".",
+  "appService.deploySubpath": "."
+}

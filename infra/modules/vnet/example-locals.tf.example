@@ -1,0 +1,373 @@
+# VNet Module 呼び出し例
+# tenant/hisys/trial/core/main.tf などで使用する際の locals.tf サンプル
+
+locals {
+  # VNet設定
+  vnet_config = {
+    name          = "vnet-p5190-spoke"
+    address_space = ["10.173.0.0/16"]
+  }
+
+  # サブネット定義
+  subnets = {
+    "P5190-Spoke-PrivateSubnet001" = {
+      address_prefix                             = "10.173.8.64/26"
+      service_endpoints                          = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.AzureCosmosDB"]
+      private_endpoint_network_policies_enabled  = false  # Private Endpoint用
+      private_link_service_network_policies_enabled = true
+    }
+    
+    "P5190-Spoke-PrivateSubnet002" = {
+      address_prefix                             = "10.173.8.128/26"
+      service_endpoints                          = ["Microsoft.Storage", "Microsoft.Web"]
+      private_endpoint_network_policies_enabled  = true
+      private_link_service_network_policies_enabled = true
+      delegation = {
+        name = "delegation-webapp"
+        service_delegation = {
+          name    = "Microsoft.Web/serverFarms"
+          actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+        }
+      }
+    }
+    
+    "P5190-Spoke-PrivateSubnet004" = {
+      address_prefix                             = "10.173.9.0/25"
+      service_endpoints                          = ["Microsoft.Storage", "Microsoft.KeyVault"]
+      private_endpoint_network_policies_enabled  = true
+      private_link_service_network_policies_enabled = true
+    }
+  }
+
+  # NSG定義
+  network_security_groups = {
+    # NSG001: Private Endpoint用
+    "P5190-Spoke-PrivateSubnetNSG001" = {
+      security_rules = concat(
+        # インバウンドルール
+        [
+          {
+            name                       = "AllowVNetInbound"
+            priority                   = 100
+            direction                  = "Inbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "VirtualNetwork"
+            destination_address_prefix = "VirtualNetwork"
+          },
+          {
+            name                       = "AllowAzureLoadBalancerInbound"
+            priority                   = 110
+            direction                  = "Inbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "AzureLoadBalancer"
+            destination_address_prefix = "*"
+          },
+          {
+            name                       = "DenyAllInbound"
+            priority                   = 4096
+            direction                  = "Inbound"
+            access                     = "Deny"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "*"
+            destination_address_prefix = "*"
+          },
+        ],
+        # アウトバウンドルール
+        [
+          {
+            name                       = "AllowVNetOutbound"
+            priority                   = 100
+            direction                  = "Outbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "VirtualNetwork"
+            destination_address_prefix = "VirtualNetwork"
+          },
+          {
+            name                       = "AllowInternetOutbound"
+            priority                   = 110
+            direction                  = "Outbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "*"
+            destination_address_prefix = "Internet"
+          },
+          {
+            name                       = "DenyAllOutbound"
+            priority                   = 4096
+            direction                  = "Outbound"
+            access                     = "Deny"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "*"
+            destination_address_prefix = "*"
+          },
+        ]
+      )
+    }
+    
+    # NSG002: Function App / Web Apps用 (Microsoft.Web/serverFarms委任)
+    "P5190-Spoke-PrivateSubnetNSG002" = {
+      security_rules = concat(
+        # インバウンドルール
+        [
+          {
+            name                       = "AllowHTTPSInbound"
+            priority                   = 100
+            direction                  = "Inbound"
+            access                     = "Allow"
+            protocol                   = "Tcp"
+            source_port_range          = "*"
+            destination_port_range     = "443"
+            source_address_prefix      = "VirtualNetwork"
+            destination_address_prefix = "*"
+          },
+          {
+            name                       = "AllowHTTPInbound"
+            priority                   = 110
+            direction                  = "Inbound"
+            access                     = "Allow"
+            protocol                   = "Tcp"
+            source_port_range          = "*"
+            destination_port_range     = "80"
+            source_address_prefix      = "VirtualNetwork"
+            destination_address_prefix = "*"
+          },
+          {
+            name                       = "AllowVNetInbound"
+            priority                   = 120
+            direction                  = "Inbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "VirtualNetwork"
+            destination_address_prefix = "VirtualNetwork"
+          },
+          {
+            name                       = "AllowAzureLoadBalancerInbound"
+            priority                   = 130
+            direction                  = "Inbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "AzureLoadBalancer"
+            destination_address_prefix = "*"
+          },
+          {
+            name                       = "DenyAllInbound"
+            priority                   = 4096
+            direction                  = "Inbound"
+            access                     = "Deny"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "*"
+            destination_address_prefix = "*"
+          },
+        ],
+        # アウトバウンドルール
+        [
+          {
+            name                       = "AllowHTTPSOutbound"
+            priority                   = 100
+            direction                  = "Outbound"
+            access                     = "Allow"
+            protocol                   = "Tcp"
+            source_port_range          = "*"
+            destination_port_range     = "443"
+            source_address_prefix      = "*"
+            destination_address_prefix = "*"
+          },
+          {
+            name                       = "AllowVNetOutbound"
+            priority                   = 110
+            direction                  = "Outbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "VirtualNetwork"
+            destination_address_prefix = "VirtualNetwork"
+          },
+          {
+            name                       = "AllowStorageOutbound"
+            priority                   = 120
+            direction                  = "Outbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "*"
+            destination_address_prefix = "Storage"
+          },
+          {
+            name                       = "AllowSqlOutbound"
+            priority                   = 130
+            direction                  = "Outbound"
+            access                     = "Allow"
+            protocol                   = "Tcp"
+            source_port_range          = "*"
+            destination_port_range     = "1433"
+            source_address_prefix      = "*"
+            destination_address_prefix = "Sql"
+          },
+          {
+            name                       = "AllowAzureMonitorOutbound"
+            priority                   = 140
+            direction                  = "Outbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "*"
+            destination_address_prefix = "AzureMonitor"
+          },
+          {
+            name                       = "DenyAllOutbound"
+            priority                   = 4096
+            direction                  = "Outbound"
+            access                     = "Deny"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "*"
+            destination_address_prefix = "*"
+          },
+        ]
+      )
+    }
+    
+    # NSG004: 汎用サブネット
+    "P5190-Spoke-PrivateSubnetNSG004" = {
+      security_rules = concat(
+        # インバウンドルール
+        [
+          {
+            name                       = "AllowVNetInbound"
+            priority                   = 100
+            direction                  = "Inbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "VirtualNetwork"
+            destination_address_prefix = "VirtualNetwork"
+          },
+          {
+            name                       = "AllowAzureLoadBalancerInbound"
+            priority                   = 110
+            direction                  = "Inbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "AzureLoadBalancer"
+            destination_address_prefix = "*"
+          },
+          {
+            name                       = "DenyAllInbound"
+            priority                   = 4096
+            direction                  = "Inbound"
+            access                     = "Deny"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "*"
+            destination_address_prefix = "*"
+          },
+        ],
+        # アウトバウンドルール
+        [
+          {
+            name                       = "AllowVNetOutbound"
+            priority                   = 100
+            direction                  = "Outbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "VirtualNetwork"
+            destination_address_prefix = "VirtualNetwork"
+          },
+          {
+            name                       = "AllowStorageOutbound"
+            priority                   = 110
+            direction                  = "Outbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "*"
+            destination_address_prefix = "Storage"
+          },
+          {
+            name                       = "AllowAzureServicesOutbound"
+            priority                   = 120
+            direction                  = "Outbound"
+            access                     = "Allow"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "*"
+            destination_address_prefixes = ["AzureKeyVault", "AzureCosmosDB", "AzureActiveDirectory"]
+          },
+          {
+            name                       = "DenyAllOutbound"
+            priority                   = 4096
+            direction                  = "Outbound"
+            access                     = "Deny"
+            protocol                   = "*"
+            source_port_range          = "*"
+            destination_port_range     = "*"
+            source_address_prefix      = "*"
+            destination_address_prefix = "*"
+          },
+        ]
+      )
+    }
+  }
+
+  # サブネット-NSG関連付け
+  subnet_nsg_associations = {
+    "P5190-Spoke-PrivateSubnet001" = "P5190-Spoke-PrivateSubnetNSG001"
+    "P5190-Spoke-PrivateSubnet002" = "P5190-Spoke-PrivateSubnetNSG002"
+    "P5190-Spoke-PrivateSubnet004" = "P5190-Spoke-PrivateSubnetNSG004"
+  }
+
+  # 共通タグ
+  common_tags = {
+    Environment = "production"
+    Project     = "P5190"
+    ManagedBy   = "Terraform"
+    Network     = "Spoke"
+  }
+}
+
+# モジュール呼び出し例
+module "vnet" {
+  source = "../../../../modules/vnet"
+
+  resource_group_name     = "rg-p5190-spoke-prod"
+  location                = "japaneast"
+  vnet_name               = local.vnet_config.name
+  address_space           = local.vnet_config.address_space
+  subnets                 = local.subnets
+  network_security_groups = local.network_security_groups
+  subnet_nsg_associations = local.subnet_nsg_associations
+  tags                    = local.common_tags
+}
