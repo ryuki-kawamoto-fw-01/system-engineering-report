@@ -19,7 +19,7 @@ terraform {
   }
   backend "azurerm" {
     resource_group_name  = "rg-tfstate-hsuibu"
-    storage_account_name = "tfstatehsuibu001"
+    storage_account_name = "tfstatehsuibu2026"
     container_name       = "tfstate"
 
     # sst-harc環境専用のStateとして分離する

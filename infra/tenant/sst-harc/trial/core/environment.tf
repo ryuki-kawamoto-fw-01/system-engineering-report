@@ -33,7 +33,7 @@ variable "tfstate_resource_group_name" {
 variable "tfstate_storage_account_name" {
   description = "Terraform state用のストレージアカウント名"
   type        = string
-  default     = "tfstatehsuibu001"
+  default     = "tfstatehsuibu2026"
 }
 
 # 初回構築フラグ（true: 初回構築、false: セキュリティ強化後）
