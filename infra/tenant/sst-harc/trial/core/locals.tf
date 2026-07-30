@@ -1323,7 +1323,7 @@ locals {
 
     # 06: ページ分割
     # Plan: EP1
-    pagespliter_001 = {
+    pagesplitter_001 = {
       name           = "func-genashi-trial-${var.environment_prefix}-06-pagesplitter"
       python_version = "3.12"
     }
@@ -1367,7 +1367,7 @@ locals {
 
     # 12: 標準エージェント用ページ分割
     # Plan: EP1
-    pagespliter_002 = {
+    pagesplitter_002 = {
       name           = "func-genashi-trial-${var.environment_prefix}-12-page-std"
       python_version = "3.12"
     }
@@ -1394,13 +1394,13 @@ locals {
     register        = "diag-func-genashi-trial-${var.environment_prefix}-03-text-register"
     pii             = "diag-func-genashi-trial-${var.environment_prefix}-04-pii"
     prompt          = "diag-func-genashi-trial-${var.environment_prefix}-05-prompt"
-    pagespliter_001 = "diag-func-genashi-trial-${var.environment_prefix}-06-pagesplitter"
+    pagesplitter_001 = "diag-func-genashi-trial-${var.environment_prefix}-06-pagesplitter"
     markdown_001    = "diag-func-genashi-trial-${var.environment_prefix}-07-markdown"
     pdf             = "diag-func-genashi-trial-${var.environment_prefix}-08-pdf"
     mfg             = "diag-func-genashi-trial-${var.environment_prefix}-09-mfg"
     agent_rag       = "diag-func-genashi-trial-${var.environment_prefix}-10-agent-rag"
     agent_document  = "diag-func-genashi-trial-${var.environment_prefix}-11-agent-document"
-    pagespliter_002 = "diag-func-genashi-trial-${var.environment_prefix}-12-page-std"
+    pagesplitter_002 = "diag-func-genashi-trial-${var.environment_prefix}-12-page-std"
     markdown_002    = "diag-func-genashi-trial-${var.environment_prefix}-13-mark-std"
     indexer         = "diag-func-genashi-trial-${var.environment_prefix}-14-indexer"
   }
@@ -1412,13 +1412,13 @@ locals {
     register        = "appi-func-genashi-trial-${var.environment_prefix}-03-text-register"
     pii             = "appi-func-genashi-trial-${var.environment_prefix}-04-pii"
     prompt          = "appi-func-genashi-trial-${var.environment_prefix}-05-prompt"
-    pagespliter_001 = "appi-func-genashi-trial-${var.environment_prefix}-06-pagesplitter"
+    pagesplitter_001 = "appi-func-genashi-trial-${var.environment_prefix}-06-pagesplitter"
     markdown_001    = "appi-func-genashi-trial-${var.environment_prefix}-07-markdown"
     pdf             = "appi-func-genashi-trial-${var.environment_prefix}-08-pdf"
     mfg             = "appi-func-genashi-trial-${var.environment_prefix}-09-mfg"
     agent_rag       = "appi-func-genashi-trial-${var.environment_prefix}-10-agent-rag"
     agent_document  = "appi-func-genashi-trial-${var.environment_prefix}-11-agent-document"
-    pagespliter_002 = "appi-func-genashi-trial-${var.environment_prefix}-12-page2"
+    pagesplitter_002 = "appi-func-genashi-trial-${var.environment_prefix}-12-page2"
     markdown_002    = "appi-func-genashi-trial-${var.environment_prefix}-13-mark2"
     indexer         = "appi-func-genashi-trial-${var.environment_prefix}-14-indexer"
   }

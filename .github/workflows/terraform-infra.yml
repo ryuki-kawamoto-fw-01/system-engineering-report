@@ -1,6 +1,4 @@
-# Phase 0: OIDCログインだけ確認
-
-name: CICD
+name: Infra CI/CD (4-Phase Deploy)
 
 on:
   workflow_dispatch:
@@ -10,17 +8,34 @@ permissions:
   id-token: write
 
 env:
+  # Terraform settings
+  TF_VERSION: "1.14.3"
+  WORKDIR_CORE: infra/tenant/sst-harc/trial/core
+  WORKDIR_AI: infra/tenant/sst-harc/trial/ai_service
+  # Azure credentials (OIDC)
   ARM_CLIENT_ID: ${{ secrets.TRIALhs_ARM_CLIENT_ID }}
   ARM_TENANT_ID: ${{ secrets.TRIALhs_ARM_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.TRIALhs_ARM_SUBSCRIPTION_ID }}
   ARM_USE_OIDC: true
+  # Frontend Authentication
+  FRONTEND_AUTH_CLIENT_ID: ${{ secrets.TRIALHS_FRONTEND_AUTH_CLIENT_ID }}
+  FRONTEND_AUTH_CLIENT_SECRET: ${{ secrets.TRIALHS_FRONTEND_AUTH_CLIENT_SECRET }}
+  # AI Search schemas
+  SCHEMAS_DIR: infra/tenant/sst-harc/trial/ai_service/schemas
 
 jobs:
-  test-login:
+  deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     environment: trial
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # Azure Login (OIDC)
+      # ------------------------------------------------------------------
       - name: Azure Login OIDC
         uses: azure/login@v2
         with:
@@ -28,5 +43,592 @@ jobs:
           tenant-id: ${{ secrets.TRIALhs_ARM_TENANT_ID }}
           subscription-id: ${{ secrets.TRIALhs_ARM_SUBSCRIPTION_ID }}
 
-      - name: Show Azure account
-        run: az account show --output table
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      # ================================================================
+      # Phase 1: init_flag=true — 全体の皮をデプロイ
+      #   - Resource Group / VNet / Private DNS Zone (本体のみ)
+      #   - Storage Account / CosmosDB / Key Vault (パブリックアクセス有効状態)
+      #   - App Service Plan / Frontend / Load Balancer / Function App x14
+      #   - Container Registry
+      # ================================================================
+
+      - name: "[Phase1] Terraform Init (core)"
+        working-directory: ${{ env.WORKDIR_CORE }}
+        run: terraform init -input=false -upgrade
+
+      - name: "[Phase1] Terraform Validate (core)"
+        working-directory: ${{ env.WORKDIR_CORE }}
+        run: terraform validate
+
+      - name: "[Phase1] Terraform Plan — init_flag=true (core)"
+        working-directory: ${{ env.WORKDIR_CORE }}
+        run: |
+          terraform plan -input=false -no-color -out=tfplan_core_init \
+            -var="init_flag=true" \
+            -var="frontend_auth_client_id=${{ env.FRONTEND_AUTH_CLIENT_ID }}" \
+            -var="frontend_auth_client_secret=${{ env.FRONTEND_AUTH_CLIENT_SECRET }}"
+
+      - name: "[Phase1] Terraform Apply — init_flag=true (core)"
+        working-directory: ${{ env.WORKDIR_CORE }}
+        run: terraform apply -input=false -auto-approve -parallelism=5 tfplan_core_init
+
+      # Phase 1 完了後にリソース情報を取得（以降のステップで利用）
+      - name: "[Phase1] Get resource info from Terraform outputs"
+        id: get-resource-info
+        working-directory: ${{ env.WORKDIR_CORE }}
+        run: |
+          RESOURCE_GROUP=$(terraform output -raw resource_group_name)
+          STORAGE_ACCOUNT_NAME=$(terraform output -raw storage_account_name)
+          KEY_VAULT_NAME=$(terraform output -raw key_vault_name)
+          EVENT_GRID_SYSTEM_TOPIC_NAME=$(terraform output -raw event_grid_system_topic_name)
+          FRONTEND_APP_NAME=$(terraform output -raw frontend_app_service_name)
+          LOADBALANCER_APP_NAME=$(terraform output -raw loadbalancer_app_service_name)
+          ACR_NAME=$(terraform output -raw container_registry_name)
+
+          echo "RESOURCE_GROUP=$RESOURCE_GROUP" >> $GITHUB_ENV
+          echo "STORAGE_ACCOUNT_NAME=$STORAGE_ACCOUNT_NAME" >> $GITHUB_ENV
+          echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
+          echo "EVENT_GRID_SYSTEM_TOPIC_NAME=$EVENT_GRID_SYSTEM_TOPIC_NAME" >> $GITHUB_ENV
+          echo "FRONTEND_APP_NAME=$FRONTEND_APP_NAME" >> $GITHUB_ENV
+          echo "LOADBALANCER_APP_NAME=$LOADBALANCER_APP_NAME" >> $GITHUB_ENV
+          echo "ACR_NAME=$ACR_NAME" >> $GITHUB_ENV
+
+          # Function App 名を取得
+          echo "FUNCTION_CHAT_NAME=$(terraform output -raw function_chat_name)" >> $GITHUB_ENV
+          echo "FUNCTION_RAG_NAME=$(terraform output -raw function_rag_name)" >> $GITHUB_ENV
+          echo "FUNCTION_REGISTER_NAME=$(terraform output -raw function_register_name)" >> $GITHUB_ENV
+          echo "FUNCTION_PII_NAME=$(terraform output -raw function_pii_name)" >> $GITHUB_ENV
+          echo "FUNCTION_PROMPT_NAME=$(terraform output -raw function_prompt_name)" >> $GITHUB_ENV
+          echo "FUNCTION_MFG_NAME=$(terraform output -raw function_mfg_name)" >> $GITHUB_ENV
+          echo "FUNCTION_AGENT_RAG_NAME=$(terraform output -raw function_agent_rag_name)" >> $GITHUB_ENV
+          echo "FUNCTION_AGENT_DOCUMENT_NAME=$(terraform output -raw function_agent_document_name)" >> $GITHUB_ENV
+          echo "FUNCTION_PAGESPLITER_001_NAME=$(terraform output -raw function_pagespliter_001_name)" >> $GITHUB_ENV
+          echo "FUNCTION_MARKDOWN_001_NAME=$(terraform output -raw function_markdown_001_name)" >> $GITHUB_ENV
+          echo "FUNCTION_PDF_NAME=$(terraform output -raw function_pdf_name)" >> $GITHUB_ENV
+          echo "FUNCTION_PAGESPLITER_002_NAME=$(terraform output -raw function_pagespliter_002_name)" >> $GITHUB_ENV
+          echo "FUNCTION_MARKDOWN_002_NAME=$(terraform output -raw function_markdown_002_name)" >> $GITHUB_ENV
+          echo "FUNCTION_INDEXER_NAME=$(terraform output -raw function_indexer_name)" >> $GITHUB_ENV
+
+      # ================================================================
+      # Phase 2: アプリケーションデプロイ
+      #   2-A. Frontend (Next.js → App Service)
+      #   2-B. Load Balancer (.NET 8 → App Service)
+      #   2-C. Backend Function Apps x14
+      # ================================================================
+
+      # ----------------------------------------------------------------
+      # Phase 2-A: Frontend
+      # ----------------------------------------------------------------
+      - name: "[Phase2-A] Set up Node.js 20"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: "[Phase2-A] Install npm 10.7.0"
+        run: npm install -g npm@10.7.0
+
+      - name: "[Phase2-A] Install frontend dependencies"
+        working-directory: frontend
+        run: npm install
+
+      - name: "[Phase2-A] Build frontend"
+        working-directory: frontend
+        run: npm run build
+
+      - name: "[Phase2-A] Deploy Frontend to Azure App Service"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FRONTEND_APP_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./frontend
+
+      # ----------------------------------------------------------------
+      # Phase 2-B: Load Balancer
+      # ----------------------------------------------------------------
+      - name: "[Phase2-B] Set up .NET 8"
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: "[Phase2-B] Build Load Balancer"
+        working-directory: loadbalancer/openai-aca-lb/src
+        run: |
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+          dotnet publish --configuration Release --no-build --output ./publish
+
+      - name: "[Phase2-B] Deploy Load Balancer to Azure App Service"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.LOADBALANCER_APP_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./loadbalancer/openai-aca-lb/src/publish
+
+      # ----------------------------------------------------------------
+      # Phase 2-C: Backend Function Apps
+      # ----------------------------------------------------------------
+      # Storage Account のパブリックアクセスを一時的に開放（デプロイに必要）
+      - name: "[Phase2-C] Temporarily allow Storage Account network access"
+        run: |
+          az storage account update \
+            --name ${{ env.STORAGE_ACCOUNT_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --default-action Allow
+
+      - name: "[Phase2-C] Azure Re-login before backend functions"
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.TRIALhs_ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.TRIALhs_ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.TRIALhs_ARM_SUBSCRIPTION_ID }}
+
+      - name: "[Phase2-C] Set up Python 3.12"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Function 1: Chat
+      - name: "[Phase2-C] Build & Deploy Function Chat"
+        run: |
+          cd backend/orchestrator
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-chat.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function Chat"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_CHAT_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-chat.zip
+
+      # Function 2: RAG
+      - name: "[Phase2-C] Build Function RAG"
+        run: |
+          cd backend/orchestrator-rag
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-rag.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function RAG"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_RAG_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-rag.zip
+
+      # Function 3: Register
+      - name: "[Phase2-C] Build Function Register"
+        run: |
+          cd backend/orchestrator-text-register
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-register.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function Register"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_REGISTER_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-register.zip
+
+      # Function 4: PII
+      - name: "[Phase2-C] Build Function PII"
+        run: |
+          cd backend/orchestrator-pii
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-pii.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function PII"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_PII_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-pii.zip
+
+      # Function 5: Prompt
+      - name: "[Phase2-C] Build Function Prompt"
+        run: |
+          cd backend/orchestrator-prompt
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-prompt.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function Prompt"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_PROMPT_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-prompt.zip
+
+      # Function 6: MFG
+      - name: "[Phase2-C] Build Function MFG"
+        run: |
+          cd backend/orchestrator-mfg
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-mfg.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function MFG"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_MFG_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-mfg.zip
+
+      # Function 7: Agent RAG
+      - name: "[Phase2-C] Build Function Agent RAG"
+        run: |
+          cd backend/orchestrator-agent
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-agent-rag.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function Agent RAG"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_AGENT_RAG_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-agent-rag.zip
+
+      # Function 8: Agent Document (orchestrator-text-registerと同コード、環境変数のみ異なる)
+      - name: "[Phase2-C] Build Function Agent Document"
+        run: |
+          cd backend/orchestrator-text-register
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-agent-document.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function Agent Document"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_AGENT_DOCUMENT_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-agent-document.zip
+
+      # 長時間実行後のトークン切れ対策
+      - name: "[Phase2-C] Azure Re-login before data preprocessing functions"
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.TRIALhs_ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.TRIALhs_ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.TRIALhs_ARM_SUBSCRIPTION_ID }}
+
+      # Function 9: Pagespliter 001
+      - name: "[Phase2-C] Build Function Pagespliter 001"
+        run: |
+          cd changedoc/pagesplitter
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-pagespliter-001.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function Pagespliter 001"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_PAGESPLITER_001_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-pagespliter-001.zip
+
+      # Function 10: Markdown 001
+      - name: "[Phase2-C] Build Function Markdown 001"
+        run: |
+          cd changedoc/markdown
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-markdown-001.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function Markdown 001"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_MARKDOWN_001_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-markdown-001.zip
+
+      # Function 11: PDF (Dockerコンテナイメージ使用)
+      - name: "[Phase2-C] Azure Re-login for ACR access"
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.TRIALhs_ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.TRIALhs_ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.TRIALhs_ARM_SUBSCRIPTION_ID }}
+
+      - name: "[Phase2-C] Stop PDF Function App to clear blocked state"
+        run: |
+          az functionapp stop \
+            --name ${{ env.FUNCTION_PDF_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }}
+          sleep 30
+
+      - name: "[Phase2-C] Build & Push Docker image for PDF Function"
+        run: |
+          REPOSITORY_NAME="convert-to-pdf"
+          IMAGE_NAME="${{ env.ACR_NAME }}.azurecr.io/${REPOSITORY_NAME}"
+          IMAGE_TAG="v1"
+
+          az acr login --name ${{ env.ACR_NAME }}
+
+          cd changedoc/converttopdf
+          docker build --build-arg _PROXY="" -t ${IMAGE_NAME}:${IMAGE_TAG} -f Dockerfile .
+          docker push ${IMAGE_NAME}:${IMAGE_TAG}
+
+          az functionapp config container set \
+            --name ${{ env.FUNCTION_PDF_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --docker-custom-image-name ${IMAGE_NAME}:${IMAGE_TAG} \
+            --docker-registry-server-url https://${{ env.ACR_NAME }}.azurecr.io
+          cd ../..
+
+      - name: "[Phase2-C] Start PDF Function App"
+        run: |
+          az functionapp start \
+            --name ${{ env.FUNCTION_PDF_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }}
+          echo "PDF Function App 起動待機 (10分)..."
+          sleep 600
+
+      - name: "[Phase2-C] Azure Re-login after PDF deployment"
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.TRIALhs_ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.TRIALhs_ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.TRIALhs_ARM_SUBSCRIPTION_ID }}
+
+      # Function 12: Pagespliter 002
+      - name: "[Phase2-C] Build Function Pagespliter 002"
+        run: |
+          cd changedoc_standard/pagesplitter
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-pagespliter-002.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function Pagespliter 002"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_PAGESPLITER_002_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-pagespliter-002.zip
+
+      # Function 13: Markdown 002
+      - name: "[Phase2-C] Build Function Markdown 002"
+        run: |
+          cd changedoc_standard/markdown
+          rm -rf .python_packages
+          pip install -r requirements.txt --target .python_packages/lib/site-packages
+          zip -r ../../function-markdown-002.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function Markdown 002"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_MARKDOWN_002_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-markdown-002.zip
+
+      # Function 14: Indexer
+      - name: "[Phase2-C] Build Function Indexer"
+        run: |
+          cd changedoc_standard/indexer
+          zip -r ../../function-indexer.zip .
+          cd ../..
+      - name: "[Phase2-C] Deploy Function Indexer"
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FUNCTION_INDEXER_NAME }}
+          resource-group-name: ${{ env.RESOURCE_GROUP }}
+          package: ./function-indexer.zip
+
+      # Function Apps の起動・登録待機
+      - name: "[Phase2-C] Wait for Function Apps to register"
+        run: |
+          echo "Function Apps の登録完了待機 (5分)..."
+          sleep 300
+
+      # ================================================================
+      # Phase 3: init_flag=false — VNet Link / RBAC / Event Grid 等を有効化
+      #   - Private DNS Zone VNet Link 作成
+      #   - Storage Account / Key Vault ネットワーク制限 (Deny)
+      #   - App Service / Function App VNet 統合有効化
+      #   - Event Grid Subscription 作成
+      #   - Key Vault Secret (Function Host Keys) 作成
+      # ================================================================
+
+      # Phase 3 前にトークンをリフレッシュ
+      - name: "[Phase3] Azure Re-login"
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.TRIALhs_ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.TRIALhs_ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.TRIALhs_ARM_SUBSCRIPTION_ID }}
+
+      # Terraform が Host Keys を取得できるよう Function App のパブリックアクセスを一時開放
+      - name: "[Phase3] Temporarily enable Function App public network access"
+        working-directory: ${{ env.WORKDIR_CORE }}
+        run: |
+          for app_name in \
+            "$(terraform output -raw function_chat_name 2>/dev/null)" \
+            "$(terraform output -raw function_rag_name 2>/dev/null)" \
+            "$(terraform output -raw function_register_name 2>/dev/null)" \
+            "$(terraform output -raw function_pii_name 2>/dev/null)" \
+            "$(terraform output -raw function_prompt_name 2>/dev/null)" \
+            "$(terraform output -raw function_mfg_name 2>/dev/null)" \
+            "$(terraform output -raw function_agent_rag_name 2>/dev/null)" \
+            "$(terraform output -raw function_agent_document_name 2>/dev/null)" \
+            "$(terraform output -raw function_pagespliter_001_name 2>/dev/null)" \
+            "$(terraform output -raw function_markdown_001_name 2>/dev/null)" \
+            "$(terraform output -raw function_pdf_name 2>/dev/null)" \
+            "$(terraform output -raw function_pagespliter_002_name 2>/dev/null)" \
+            "$(terraform output -raw function_markdown_002_name 2>/dev/null)" \
+            "$(terraform output -raw function_indexer_name 2>/dev/null)"; do
+            if [ -n "$app_name" ]; then
+              az functionapp update \
+                --name "$app_name" \
+                --resource-group ${{ env.RESOURCE_GROUP }} \
+                --set publicNetworkAccess=Enabled
+              az webapp config set \
+                --name "$app_name" \
+                --resource-group ${{ env.RESOURCE_GROUP }} \
+                --generic-configurations '{"scmIpSecurityRestrictionsUseMain": true}'
+            fi
+          done
+          sleep 60
+
+      # Key Vault のパブリックアクセスを一時開放（Host Keys シークレット書き込みのため）
+      - name: "[Phase3] Temporarily allow Key Vault network access"
+        run: |
+          az keyvault update \
+            --name ${{ env.KEY_VAULT_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --public-network-access Enabled \
+            --default-action Allow
+          sleep 60
+
+      # Storage Account のパブリックアクセスを一時開放（Terraform State 確認のため）
+      - name: "[Phase3] Temporarily allow Storage Account network access"
+        run: |
+          az storage account update \
+            --name ${{ env.STORAGE_ACCOUNT_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --default-action Allow
+
+      - name: "[Phase3] Terraform Plan — init_flag=false (core)"
+        working-directory: ${{ env.WORKDIR_CORE }}
+        run: |
+          terraform plan -input=false -no-color -out=tfplan_core_noinit \
+            -var="frontend_auth_client_id=${{ env.FRONTEND_AUTH_CLIENT_ID }}" \
+            -var="frontend_auth_client_secret=${{ env.FRONTEND_AUTH_CLIENT_SECRET }}"
+
+      - name: "[Phase3] Terraform Apply — init_flag=false (core)"
+        working-directory: ${{ env.WORKDIR_CORE }}
+        run: terraform apply -input=false -auto-approve tfplan_core_noinit
+
+      # AI Service のデプロイ (init_flag=true → false)
+      - name: "[Phase3] Terraform Init (ai_service)"
+        working-directory: ${{ env.WORKDIR_AI }}
+        run: terraform init -input=false -upgrade
+
+      - name: "[Phase3] Terraform Plan — init_flag=true (ai_service)"
+        working-directory: ${{ env.WORKDIR_AI }}
+        run: terraform plan -input=false -no-color -out=tfplan_ai_init -var="init_flag=true"
+
+      - name: "[Phase3] Terraform Apply — init_flag=true (ai_service)"
+        working-directory: ${{ env.WORKDIR_AI }}
+        run: terraform apply -input=false -auto-approve -parallelism=2 tfplan_ai_init
+
+      - name: "[Phase3] Terraform Plan — init_flag=false (ai_service)"
+        working-directory: ${{ env.WORKDIR_AI }}
+        run: terraform plan -input=false -no-color -out=tfplan_ai_noinit
+
+      - name: "[Phase3] Terraform Apply — init_flag=false (ai_service)"
+        working-directory: ${{ env.WORKDIR_AI }}
+        run: terraform apply -input=false -auto-approve tfplan_ai_noinit
+
+      # ================================================================
+      # Phase 4: 全体の閉域化
+      #   - Function App パブリックアクセス無効化 (SCM も Deny)
+      #   - Storage Account パブリックネットワークアクセス無効化
+      #   - Key Vault パブリックネットワークアクセス無効化
+      # ================================================================
+
+      - name: "[Phase4] Azure Re-login before hardening"
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.TRIALhs_ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.TRIALhs_ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.TRIALhs_ARM_SUBSCRIPTION_ID }}
+
+      # Function App のパブリックアクセスを無効化 (SCM も独立 Deny)
+      - name: "[Phase4] Disable Function App public network access"
+        working-directory: ${{ env.WORKDIR_CORE }}
+        run: |
+          for app_name in \
+            "$(terraform output -raw function_chat_name 2>/dev/null)" \
+            "$(terraform output -raw function_rag_name 2>/dev/null)" \
+            "$(terraform output -raw function_register_name 2>/dev/null)" \
+            "$(terraform output -raw function_pii_name 2>/dev/null)" \
+            "$(terraform output -raw function_prompt_name 2>/dev/null)" \
+            "$(terraform output -raw function_mfg_name 2>/dev/null)" \
+            "$(terraform output -raw function_agent_rag_name 2>/dev/null)" \
+            "$(terraform output -raw function_agent_document_name 2>/dev/null)" \
+            "$(terraform output -raw function_pagespliter_001_name 2>/dev/null)" \
+            "$(terraform output -raw function_markdown_001_name 2>/dev/null)" \
+            "$(terraform output -raw function_pdf_name 2>/dev/null)" \
+            "$(terraform output -raw function_pagespliter_002_name 2>/dev/null)" \
+            "$(terraform output -raw function_markdown_002_name 2>/dev/null)" \
+            "$(terraform output -raw function_indexer_name 2>/dev/null)"; do
+            if [ -n "$app_name" ]; then
+              echo "Disabling public access: $app_name"
+              az functionapp update \
+                --name "$app_name" \
+                --resource-group ${{ env.RESOURCE_GROUP }} \
+                --set publicNetworkAccess=Disabled
+              az webapp config set \
+                --name "$app_name" \
+                --resource-group ${{ env.RESOURCE_GROUP }} \
+                --generic-configurations '{"scmIpSecurityRestrictionsUseMain": false, "scmIpSecurityRestrictionsDefaultAction": "Deny"}'
+            fi
+          done
+          echo "✅ 全 Function App のパブリックアクセスを無効化しました"
+
+      # Storage Account パブリックネットワークアクセスを完全無効化
+      - name: "[Phase4] Disable Storage Account public network access"
+        run: |
+          az storage account update \
+            --name ${{ env.STORAGE_ACCOUNT_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --public-network-access Disabled
+          echo "✅ Storage Account のパブリックアクセスを無効化しました"
+
+      # Key Vault パブリックネットワークアクセスを完全無効化
+      - name: "[Phase4] Disable Key Vault public network access"
+        run: |
+          az keyvault update \
+            --name ${{ env.KEY_VAULT_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --public-network-access Disabled \
+            --default-action Deny
+          echo "✅ Key Vault のパブリックアクセスを無効化しました"
+
+      # ================================================================
+      # 最終確認サマリー
+      # ================================================================
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## Infra CI/CD 4-Phase Deploy Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase | 内容 |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase 1 | Terraform Apply (init_flag=true) — 全体の皮 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase 2 | Frontend / Load Balancer / Backend Function x14 デプロイ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase 3 | Terraform Apply (init_flag=false) — VNet Link / RBAC / Event Grid |" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase 4 | 閉域化 — Function App / Storage / Key Vault パブリックアクセス無効化 |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Resources" >> $GITHUB_STEP_SUMMARY
+          echo "- Resource Group: ${{ env.RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: ${{ env.FRONTEND_APP_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Load Balancer: ${{ env.LOADBALANCER_APP_NAME }}" >> $GITHUB_STEP_SUMMARY

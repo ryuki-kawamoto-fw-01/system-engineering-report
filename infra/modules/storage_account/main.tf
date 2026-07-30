@@ -15,12 +15,12 @@
 #   - Storage Account本体を作成する
 #   - Container、Queue、フォルダー構造を作成する
 #   - 初期構築に必要なネットワークアクセスを維持する
-#   - Blob／Queue診断設定は作成しない
+#   - Blob／Queue診断設定を作成する
 #
 # Phase 3（init_flag=false）:
 #   - ネットワークの既定動作をDenyへ変更する
 #   - 指定されたSubnetからのアクセスを許可する
-#   - Blob／Queue診断設定を作成する
+#   - Blob／Queue診断設定を維持する
 # =============================================================================
 
 # =============================================================================
@@ -198,11 +198,9 @@ resource "azurerm_storage_blob" "folder_placeholder" {
 # =============================================================================
 # Diagnostic Settings - Blob Service
 # =============================================================================
-# Phase 1では作成せず、Phase 3でログ・メトリックの転送を開始する。
+# Phaseに関係なく作成し、ログ・メトリックの転送を有効化する。
 
 resource "azurerm_monitor_diagnostic_setting" "blob" {
-  count = var.init_flag ? 0 : 1
-
   name = var.blob_diagnostic_setting_name
 
   target_resource_id = (
@@ -225,11 +223,9 @@ resource "azurerm_monitor_diagnostic_setting" "blob" {
 # =============================================================================
 # Diagnostic Settings - Queue Service
 # =============================================================================
-# Phase 1では作成せず、Phase 3でログ・メトリックの転送を開始する。
+# Phaseに関係なく作成し、ログ・メトリックの転送を有効化する。
 
 resource "azurerm_monitor_diagnostic_setting" "queue" {
-  count = var.init_flag ? 0 : 1
-
   name = var.queue_diagnostic_setting_name
 
   target_resource_id = (

@@ -111,14 +111,14 @@ variable "security_group_object_id" {
 variable "frontend_auth_client_id" {
   description = "事前登録されたAzure ADアプリケーションのClient ID"
   type        = string
-  default     = "00000000-0000-0000-0000-000000000000"
+  default     = "8c201204-4afc-4e00-849b-97063a8e347f"
 }
 
 variable "frontend_auth_client_secret" {
   description = "Frontend認証用Client Secret"
   type        = string
   sensitive   = true
-  default     = "dummy-secret-for-validation"
+  default     = "efc42adf-87bc-4f4c-9b82-e7689297727c"
 }
 
 # Frontend IP制限設定

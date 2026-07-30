@@ -955,12 +955,12 @@ module "azure_function_prompt" {
 # -----------------------------------------------------------------------------
 # 規格検索向けのページ分割処理を担当する。
 # Phase 3ではEvent Grid Subscriptionの配送先となる。
-module "azure_function_pagespliter_001" {
+module "azure_function_pagesplitter_001" {
   source = "../../../../modules/azure_function"
 
   resource_group_name = module.common.resource_group_name
   location            = local.location
-  function_app_name   = local.function_app.pagespliter_001.name
+  function_app_name   = local.function_app.pagesplitter_001.name
   service_plan_id     = module.app_service.app_service_plan_02_id
 
   storage_account_name          = module.storage_account.storage_account_name
@@ -968,13 +968,13 @@ module "azure_function_pagespliter_001" {
   storage_uses_managed_identity = true
   virtual_network_subnet_id     = module.vnet.subnet_02_id
 
-  python_version           = local.function_app.pagespliter_001.python_version
+  python_version           = local.function_app.pagesplitter_001.python_version
   init_flag                = var.init_flag
   use_storageaccount_queue = true
 
-  application_insights_name  = local.function_application_insights.pagespliter_001
+  application_insights_name  = local.function_application_insights.pagesplitter_001
   log_analytics_workspace_id = module.log_analytics.log_analytics_workspace_id
-  diagnostic_setting_name    = local.function_diagnostic_settings.pagespliter_001
+  diagnostic_setting_name    = local.function_diagnostic_settings.pagesplitter_001
 
   additional_app_settings = [
     for setting_name, setting_value in jsondecode(
@@ -1211,12 +1211,12 @@ module "azure_function_agent_document" {
 # 12. Pagesplitter 002 Function
 # -----------------------------------------------------------------------------
 # 標準文書向けのページ分割処理を担当する。
-module "azure_function_pagespliter_002" {
+module "azure_function_pagesplitter_002" {
   source = "../../../../modules/azure_function"
 
   resource_group_name = module.common.resource_group_name
   location            = local.location
-  function_app_name   = local.function_app.pagespliter_002.name
+  function_app_name   = local.function_app.pagesplitter_002.name
   service_plan_id     = module.app_service.app_service_plan_02_id
 
   storage_account_name          = module.storage_account.storage_account_name
@@ -1224,13 +1224,13 @@ module "azure_function_pagespliter_002" {
   storage_uses_managed_identity = true
   virtual_network_subnet_id     = module.vnet.subnet_02_id
 
-  python_version           = local.function_app.pagespliter_002.python_version
+  python_version           = local.function_app.pagesplitter_002.python_version
   init_flag                = var.init_flag
   use_storageaccount_queue = true
 
-  application_insights_name  = local.function_application_insights.pagespliter_002
+  application_insights_name  = local.function_application_insights.pagesplitter_002
   log_analytics_workspace_id = module.log_analytics.log_analytics_workspace_id
-  diagnostic_setting_name    = local.function_diagnostic_settings.pagespliter_002
+  diagnostic_setting_name    = local.function_diagnostic_settings.pagesplitter_002
 
   additional_app_settings = [
     for setting_name, setting_value in jsondecode(
@@ -1975,7 +1975,7 @@ module "event_grid" {
   # Page Splitter Event Subscription
   enable_pagesplitter_subscription = !var.init_flag
   pagesplitter_subscription_name   = "pagesplitter"
-  pagesplitter_function_id         = "${module.azure_function_pagespliter_001.azure_function_id}/functions/page_splitter"
+  pagesplitter_function_id         = "${module.azure_function_pagesplitter_001.azure_function_id}/functions/page_splitter"
   pagesplitter_container_path      = local.event_grid.pagesplitter_container_path
 
   # 診断設定
@@ -1988,7 +1988,7 @@ module "event_grid" {
   depends_on = [
     module.azure_function_pdf,
     module.azure_function_markdown_001,
-    module.azure_function_pagespliter_001
+    module.azure_function_pagesplitter_001
   ]
 }
 

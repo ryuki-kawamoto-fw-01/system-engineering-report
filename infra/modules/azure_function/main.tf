@@ -79,6 +79,95 @@ resource "azurerm_linux_function_app" "this" {
   )
 }
 
+# =============================================================================
+# Role Definitions
+# =============================================================================
+
+data "azurerm_role_definition" "storage_account_contributor" {
+  name  = "Storage Account Contributor"
+  scope = var.storage_account_id
+}
+
+data "azurerm_role_definition" "blob_data_owner" {
+  name  = "Storage Blob Data Owner"
+  scope = var.storage_account_id
+}
+
+data "azurerm_role_definition" "queue_data_contributor" {
+  count = var.use_storageaccount_queue ? 1 : 0
+  name  = "Storage Queue Data Contributor"
+  scope = var.storage_account_id
+}
+
+data "azurerm_role_definition" "acr_pull" {
+  count = var.create_acr_role_assignment ? 1 : 0
+  name  = "AcrPull"
+  scope = var.container_registry_id
+}
+
+# =============================================================================
+# Role Assignments
+# =============================================================================
+
+resource "azurerm_role_assignment" "mi_sa_contributor" {
+  scope              = var.storage_account_id
+  role_definition_id = data.azurerm_role_definition.storage_account_contributor.role_definition_id
+  principal_id       = azurerm_linux_function_app.this.identity[0].principal_id
+
+  skip_service_principal_aad_check = true
+
+  depends_on = [azurerm_linux_function_app.this]
+}
+
+resource "azurerm_role_assignment" "mi_blob_data_owner" {
+  scope              = var.storage_account_id
+  role_definition_id = data.azurerm_role_definition.blob_data_owner.role_definition_id
+  principal_id       = azurerm_linux_function_app.this.identity[0].principal_id
+
+  skip_service_principal_aad_check = true
+
+  depends_on = [azurerm_linux_function_app.this]
+}
+
+resource "azurerm_role_assignment" "mi_queue_data_contributor" {
+  count              = var.use_storageaccount_queue ? 1 : 0
+  scope              = var.storage_account_id
+  role_definition_id = data.azurerm_role_definition.queue_data_contributor[0].role_definition_id
+  principal_id       = azurerm_linux_function_app.this.identity[0].principal_id
+
+  skip_service_principal_aad_check = true
+
+  depends_on = [azurerm_linux_function_app.this]
+}
+
+resource "azurerm_role_assignment" "mi_acr_pull" {
+  count              = var.create_acr_role_assignment ? 1 : 0
+  scope              = var.container_registry_id
+  role_definition_id = data.azurerm_role_definition.acr_pull[0].role_definition_id
+  principal_id       = azurerm_linux_function_app.this.identity[0].principal_id
+
+  skip_service_principal_aad_check = true
+
+  depends_on = [azurerm_linux_function_app.this]
+}
+
+resource "azurerm_cosmosdb_sql_role_assignment" "mi_cosmosdb_contributor" {
+  count               = var.create_cosmos_db_role_assignment ? 1 : 0
+  resource_group_name = var.resource_group_name
+
+  account_name = element(
+    split("/", var.cosmos_db_id),
+    length(split("/", var.cosmos_db_id)) - 1
+  )
+
+  role_definition_id = "${var.cosmos_db_id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+
+  principal_id = azurerm_linux_function_app.this.identity[0].principal_id
+  scope        = var.cosmos_db_id
+
+  depends_on = [azurerm_linux_function_app.this]
+}
+
 # 診断設定
 resource "azurerm_monitor_diagnostic_setting" "this" {
   name                       = var.diagnostic_setting_name

@@ -26,3 +26,14 @@ terraform {
     key = "sst-harc/core/terraform.tfstate"
   }
 }
+
+# module label rename without resource recreation
+moved {
+  from = module.azure_function_pagespliter_001
+  to   = module.azure_function_pagesplitter_001
+}
+
+moved {
+  from = module.azure_function_pagespliter_002
+  to   = module.azure_function_pagesplitter_002
+}
