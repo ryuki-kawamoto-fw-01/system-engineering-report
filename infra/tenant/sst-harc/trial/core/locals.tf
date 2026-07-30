@@ -164,7 +164,7 @@ locals {
   #   - function: stgenashitestfunc01 (20文字)
   #   - frontend: stgenashitestfe01 (18文字)
   # Storage Account
-  storage_account_name     = "stgenashitrial${var.environment_prefix}" # 最大24文字以内、一意性制約
+  storage_account_name     = "stgenashitrial${var.environment_prefix}dummy" # 最大24文字以内、一意性制約
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
