@@ -11,7 +11,6 @@ env:
   # Terraform settings
   TF_VERSION: "1.14.3"
   WORKDIR_CORE: infra/tenant/sst-harc/trial/core
-  WORKDIR_AI: infra/tenant/sst-harc/trial/ai_service
   # Azure credentials (OIDC)
   ARM_CLIENT_ID: ${{ secrets.TRIALhs_ARM_CLIENT_ID }}
   ARM_TENANT_ID: ${{ secrets.TRIALhs_ARM_TENANT_ID }}
@@ -569,27 +568,6 @@ jobs:
       - name: "[Phase3] Terraform Apply — init_flag=false (core)"
         working-directory: ${{ env.WORKDIR_CORE }}
         run: terraform apply -input=false -auto-approve tfplan_core_noinit
-
-      # AI Service のデプロイ (init_flag=true → false)
-      - name: "[Phase3] Terraform Init (ai_service)"
-        working-directory: ${{ env.WORKDIR_AI }}
-        run: terraform init -input=false -upgrade
-
-      - name: "[Phase3] Terraform Plan — init_flag=true (ai_service)"
-        working-directory: ${{ env.WORKDIR_AI }}
-        run: terraform plan -input=false -no-color -out=tfplan_ai_init -var="init_flag=true"
-
-      - name: "[Phase3] Terraform Apply — init_flag=true (ai_service)"
-        working-directory: ${{ env.WORKDIR_AI }}
-        run: terraform apply -input=false -auto-approve -parallelism=2 tfplan_ai_init
-
-      - name: "[Phase3] Terraform Plan — init_flag=false (ai_service)"
-        working-directory: ${{ env.WORKDIR_AI }}
-        run: terraform plan -input=false -no-color -out=tfplan_ai_noinit
-
-      - name: "[Phase3] Terraform Apply — init_flag=false (ai_service)"
-        working-directory: ${{ env.WORKDIR_AI }}
-        run: terraform apply -input=false -auto-approve tfplan_ai_noinit
 
       # ================================================================
       # Phase 4: 全体の閉域化
