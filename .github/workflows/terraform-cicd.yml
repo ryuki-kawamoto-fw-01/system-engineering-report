@@ -1,4 +1,4 @@
-name: Infra CI/CD (4-Phase Deploy)
+﻿name: Infra CI/CD (4-Phase Deploy)
 
 on:
   workflow_dispatch:
@@ -68,6 +68,10 @@ jobs:
       - name: "[Phase1] Terraform Plan — init_flag=true (core)"
         working-directory: ${{ env.WORKDIR_CORE }}
         run: |
+          echo "Verifying PDF Function App environment variables configuration..."
+          echo "Content of env_vars/08-pdf.tpl:"
+          cat env_vars/08-pdf.tpl
+          echo ""
           terraform plan -input=false -no-color -out=tfplan_core_init \
             -var="init_flag=true" \
             -var="frontend_auth_client_id=${{ env.FRONTEND_AUTH_CLIENT_ID }}" \
@@ -136,9 +140,22 @@ jobs:
         working-directory: frontend
         run: npm install
 
+      - name: "[Phase2-A] Format frontend code"
+        working-directory: frontend
+        run: npm run format
+
+      - name: "[Phase2-A] Lint frontend code"
+        working-directory: frontend
+        run: npm run lint
+
       - name: "[Phase2-A] Build frontend"
         working-directory: frontend
+        env:
+          NEXT_PUBLIC_STANDARD_STORAGE_CONTAINER_NAME: genashi-trial-06
+          NEXT_PUBLIC_STANDARD_PREVIEW_STORAGE_CONTAINER_NAME: genashi-trial-06
+          NEXT_PUBLIC_DISABLED_ROUTE_PREFIXES: image-generation,create-manual
         run: npm run build
+        continue-on-error: false
 
       - name: "[Phase2-A] Deploy Frontend to Azure App Service"
         uses: azure/webapps-deploy@v3
@@ -392,6 +409,16 @@ jobs:
           echo "PDF Function App 起動待機 (10分)..."
           sleep 600
 
+      # PDF Function App の環境変数設定確認
+      - name: "[Phase2-C] Verify PDF Function App environment variables"
+        run: |
+          echo "Verifying PDF Function App environment variables..."
+          az functionapp config appsettings list \
+            --name ${{ env.FUNCTION_PDF_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "[?name=='FUNCTIONS_WORKER_RUNTIME' || name=='DOCKER_REGISTRY_SERVER_URL' || name=='AzureWebJobsStorage__accountName' || name=='AZURE_BLOB_STORAGE_DST_CON_STR' || name=='AZURE_BLOB_STORAGE_DST_CONTAINER'].{Name:name,Value:value}" \
+            --output table
+
       - name: "[Phase2-C] Azure Re-login after PDF deployment"
         uses: azure/login@v2
         with:
@@ -445,8 +472,8 @@ jobs:
       # Function Apps の起動・登録待機
       - name: "[Phase2-C] Wait for Function Apps to register"
         run: |
-          echo "Function Apps の登録完了待機 (5分)..."
-          sleep 300
+          echo "Function Apps の登録完了待機 (3分)..."
+          sleep 180
 
       # ================================================================
       # Phase 3: init_flag=false — VNet Link / RBAC / Event Grid 等を有効化
@@ -514,6 +541,23 @@ jobs:
             --name ${{ env.STORAGE_ACCOUNT_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --default-action Allow
+
+      # Function Apps が完全に起動するまで待機（Host Keys 取得エラー回避のため）
+      - name: "[Phase3] Wait for Function Apps to be fully ready"
+        run: |
+          echo "Function Apps の完全起動待機 (5分)..."
+          echo "これにより Terraform の Host Keys 取得時の InternalServerError を回避します"
+          sleep 300
+
+      # Load Balancer の環境変数が webapps-deploy により上書きされるため
+      # Terraform State から appsettings リソースを削除して Phase 3 で再作成させる
+      - name: "[Phase3] Remove loadbalancer_appsettings from Terraform State"
+        working-directory: ${{ env.WORKDIR_CORE }}
+        run: |
+          echo "Load Balancer デプロイ後に環境変数がリセットされる問題の回避..."
+          echo "Terraform State から loadbalancer_appsettings を削除 → Phase 3 Apply で再作成"
+          terraform state rm 'module.app_service.azapi_update_resource.loadbalancer_appsettings' \
+            || echo "State にリソースが存在しません（初回デプロイ時は正常）"
 
       - name: "[Phase3] Terraform Plan — init_flag=false (core)"
         working-directory: ${{ env.WORKDIR_CORE }}
@@ -612,6 +656,28 @@ jobs:
             --public-network-access Disabled \
             --default-action Deny
           echo "✅ Key Vault のパブリックアクセスを無効化しました"
+
+      # ネットワーク設定変更後に主要サービスを再起動して Private Endpoint 接続を確立
+      - name: "[Phase4] Restart critical services"
+        working-directory: ${{ env.WORKDIR_CORE }}
+        run: |
+          FRONTEND_APP=$(terraform output -raw frontend_app_service_name 2>/dev/null || echo "")
+          LOADBALANCER_APP=$(terraform output -raw loadbalancer_app_service_name 2>/dev/null || echo "")
+          PDF_APP=$(terraform output -raw function_pdf_name 2>/dev/null || echo "")
+
+          if [ -n "$FRONTEND_APP" ]; then
+            echo "Frontend App Service 再起動: $FRONTEND_APP"
+            az webapp restart --name "$FRONTEND_APP" --resource-group ${{ env.RESOURCE_GROUP }}
+          fi
+          if [ -n "$LOADBALANCER_APP" ]; then
+            echo "Load Balancer App Service 再起動: $LOADBALANCER_APP"
+            az webapp restart --name "$LOADBALANCER_APP" --resource-group ${{ env.RESOURCE_GROUP }}
+          fi
+          if [ -n "$PDF_APP" ]; then
+            echo "PDF Function App 再起動: $PDF_APP"
+            az functionapp restart --name "$PDF_APP" --resource-group ${{ env.RESOURCE_GROUP }}
+          fi
+          echo "✅ 主要サービスの再起動完了（Private Endpoint 経由接続を確立）"
 
       # ================================================================
       # 最終確認サマリー
